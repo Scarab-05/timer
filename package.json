@@ -1,0 +1,43 @@
+{
+  "name": "nextjs-multi-timer-app",
+  "version": "1.0.0",
+  "description": "A web application for managing multiple timers for presentations with real-time visualization and synchronization across devices.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "jest"
+  },
+  "keywords": [
+    "nextjs",
+    "timers",
+    "presentation",
+    "real-time",
+    "synchronization"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
+    "@supabase/supabase-js": "^2.88.0",
+    "dotenv": "^17.2.3",
+    "next": "latest",
+    "pg": "^8.16.3",
+    "prisma": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "ws": "latest"
+  },
+  "devDependencies": {
+    "@types/jest": "latest",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "eslint": "latest",
+    "jest": "latest",
+    "ts-jest": "latest"
+  }
+}
