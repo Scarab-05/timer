@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Timer } from '../types';
-import { supabase } from '../lib/supabase';
 
 interface TimerContextType {
   timers: Timer[];
@@ -14,100 +13,90 @@ interface TimerContextType {
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
 
+const STORAGE_KEY = 'timers';
+const CHANNEL_NAME = 'timer-sync';
+
 export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [timers, setTimers] = useState<Timer[]>([]);
+  const [channel, setChannel] = useState<BroadcastChannel | null>(null);
 
+  // Load timers from localStorage on mount
   useEffect(() => {
-    const loadTimers = async () => {
-      try {
-        const response = await fetch('/api/timers');
-        if (response.ok) {
-          const data = await response.json();
-          setTimers(data);
+    console.log('Loading timers from localStorage...');
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      console.log('Timers loaded:', parsed);
+      setTimers(parsed);
+    }
+
+    // Setup BroadcastChannel for cross-tab sync
+    if (typeof window !== 'undefined') {
+      const bc = new BroadcastChannel(CHANNEL_NAME);
+      bc.onmessage = (event) => {
+        console.log('Broadcast received:', event.data);
+        if (event.data.type === 'TIMERS_UPDATE') {
+          setTimers(event.data.timers);
         }
-      } catch (error) {
-        console.error('Failed to load timers:', error);
-      }
-    };
-    loadTimers();
+      };
+      setChannel(bc);
 
-    // Subscribe to real-time changes
-    const channel = supabase
-      .channel('timers')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'Timer' }, (payload) => {
-        console.log('Change received!', payload);
-        loadTimers(); // Reload timers on any change
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        bc.close();
+      };
+    }
   }, []);
 
-  const addTimer = async (timer: Timer) => {
-    setTimers((prevTimers) => [...prevTimers, timer]);
-    // Persist to database
-    try {
-      const response = await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: timer.title, duration: timer.duration }),
-      });
-      if (response.ok) {
-        const savedTimer = await response.json();
-        // Update with real id
-        setTimers((prevTimers) =>
-          prevTimers.map((t) => (t.id === timer.id ? { ...savedTimer, remainingTime: savedTimer.remainingTime } : t))
-        );
-      }
-    } catch (error) {
-      console.error('Failed to save timer:', error);
+  // Save to localStorage and broadcast whenever timers change
+  const syncTimers = (newTimers: Timer[]) => {
+    console.log('Syncing timers:', newTimers);
+    setTimers(newTimers);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTimers));
+    if (channel) {
+      channel.postMessage({ type: 'TIMERS_UPDATE', timers: newTimers });
     }
   };
 
-  const updateTimer = async (id: string, updatedTimer: Partial<Timer>) => {
-    setTimers((prevTimers) =>
-      prevTimers.map((timer) => (timer.id === id ? { ...timer, ...updatedTimer } : timer))
+  const addTimer = (timer: Timer) => {
+    console.log('Adding timer:', timer);
+    syncTimers([...timers, timer]);
+  };
+
+  const updateTimer = (id: string, updatedTimer: Partial<Timer>) => {
+    const newTimers = timers.map((timer) =>
+      timer.id === id ? { ...timer, ...updatedTimer } : timer
     );
-    // Persist to database
-    try {
-      await fetch('/api/timers', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...updatedTimer }),
-      });
-    } catch (error) {
-      console.error('Failed to update timer:', error);
-    }
+    syncTimers(newTimers);
   };
 
-  const removeTimer = async (id: string) => {
-    setTimers((prevTimers) => prevTimers.filter((timer) => timer.id !== id));
-    // Persist to database
-    try {
-      await fetch('/api/timers', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch (error) {
-      console.error('Failed to delete timer:', error);
-    }
+  const removeTimer = (id: string) => {
+    const newTimers = timers.filter((timer) => timer.id !== id);
+    syncTimers(newTimers);
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimers((prevTimers) =>
-        prevTimers.map((timer) =>
+      setTimers((prevTimers) => {
+        const newTimers = prevTimers.map((timer) =>
           timer.isActive && timer.remainingTime > 0
             ? { ...timer, remainingTime: timer.remainingTime - 1 }
             : timer
-        )
-      );
+        );
+        // Check if any timer changed
+        const hasChanged = newTimers.some((timer, i) =>
+          timer.remainingTime !== prevTimers[i].remainingTime
+        );
+        if (hasChanged) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newTimers));
+          if (channel) {
+            channel.postMessage({ type: 'TIMERS_UPDATE', timers: newTimers });
+          }
+        }
+        return newTimers;
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [channel]);
 
   const startTimer = (id: string) => {
     updateTimer(id, { isActive: true, isPaused: false });
@@ -118,11 +107,10 @@ export const TimerProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const resetTimer = (id: string) => {
-    setTimers((prevTimers) =>
-      prevTimers.map((timer) =>
-        timer.id === id ? { ...timer, remainingTime: timer.duration, isActive: false, isPaused: false } : timer
-      )
+    const newTimers = timers.map((timer) =>
+      timer.id === id ? { ...timer, remainingTime: timer.duration, isActive: false, isPaused: false } : timer
     );
+    syncTimers(newTimers);
   };
 
   return (

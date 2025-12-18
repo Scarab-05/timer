@@ -7,8 +7,23 @@ const DisplayPage = () => {
   const { timers } = useTimerContext();
 
   return (
-    <div style={{ fontSize: '2rem', textAlign: 'center', padding: '20px' }}>
-      <h1>Active Timers</h1>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #1a1d29 0%, #2d3142 100%)',
+      padding: '40px 20px',
+      color: '#e8eaed'
+    }}>
+      <h1 style={{
+        fontSize: '3rem',
+        textAlign: 'center',
+        marginBottom: '40px',
+        background: 'linear-gradient(135deg, #60a5fa, #a78bfa)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text'
+      }}>
+        Timers Ativos
+      </h1>
       <SyncIndicator isSynced={true} />
       <TimerList timers={timers} />
     </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import TimerCard from './TimerCard';
 import { Timer } from '../types';
+import styles from '../styles/dashboard.module.css';
 
 interface TimerListProps {
   timers: Timer[];
@@ -12,7 +13,7 @@ interface TimerListProps {
 
 const TimerList: React.FC<TimerListProps> = ({ timers, onStart, onPause, onReset, onRemove }) => {
   return (
-    <div>
+    <div className={styles.timerList}>
       {timers.map((timer) => (
         <TimerCard key={timer.id} timer={timer} onStart={onStart} onPause={onPause} onReset={onReset} onRemove={onRemove} />
       ))}
